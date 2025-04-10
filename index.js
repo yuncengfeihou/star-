@@ -41,7 +41,7 @@ const logPrefix = `[${extensionName}]`;
 const pluginFolderName = 'chat-filler-plugin'; // <--- 必须与你的插件文件夹名一致!
 
 // --- 要填充的消息的索引 (基于 0 的数组索引) ---
-const TARGET_MESSAGE_INDICES = [1, 3, 7];
+const TARGET_MESSAGE_INDICES = [0, 2, 3];
 
 // 核心功能：处理填充按钮点击事件 (函数本身逻辑不变)
 async function handleFillButtonClick() {
