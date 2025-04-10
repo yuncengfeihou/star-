@@ -1,15 +1,21 @@
+// chat-filler-plugin/index.js
+// ═════════════════════════════════════════════════════════════════════════
+// 聊天填充插件 (Chat Filler Plugin) v1.0.1
+// 功能: 在“扩展”页面添加设置区域，包含一个按钮，点击后获取当前聊天中
+//       特定索引的消息，创建新聊天并填充这些消息。
+// ═════════════════════════════════════════════════════════════════════════
+
+// --- 核心 SillyTavern 函数导入 ---
 import {
     // 聊天操作
-    doNewChat,              // 创建新聊天
-    addOneMessage,          // 添加单条消息到当前聊天
-    saveChatConditional,    // 条件性保存当前聊天
-    // 上下文与状态
-    chat as globalChat,     // 当前活动聊天记录数组 (会随切换变化)
-    this_chid,              // 当前角色 ID
-    is_send_press,          // 检查角色是否正在生成
-    isChatSaving,           // 检查聊天是否正在保存
-    // UI 与工具
-    // (可选) 如果需要更复杂的加载提示，可以导入 showLoader/hideLoader
+    doNewChat,
+    addOneMessage,
+    saveChatConditional,
+    // 上下文与状态    
+    chat as globalChat,
+    this_chid,
+    is_send_press,
+    isChatSaving,
 } from "../../../../script.js";
 
 import {
@@ -19,32 +25,29 @@ import {
 
 // --- 群组聊天相关导入 ---
 import {
-    selected_group,         // 当前群组 ID
-    is_group_generating     // 检查群组是否正在生成
+    selected_group,
+    is_group_generating
 } from "../../../group-chats.js";
 
+// --- 扩展模板加载 ---
+import { renderExtensionTemplateAsync } from '../../../extensions.js';
+
 // --- Toastr 通知库 ---
-// 注意：SillyTavern 通常已全局加载 toastr，但显式导入更清晰
 // import { toastr } from '../../../../lib/toastr.js';
-// 如果上面导入无效或报错，尝试直接使用全局的 toastr
 
 // --- 插件常量 ---
-const extensionName = "star-"; // 与文件夹名称一致
-const extensionFolderPath = `scripts/extensions/third-party/${extensionName}`;
-const logPrefix = `[${extensionName}]`; // 日志前缀
+const extensionName = "chat-filler-plugin";
+const logPrefix = `[${extensionName}]`;
+const pluginFolderName = 'chat-filler-plugin'; // <--- 必须与你的插件文件夹名一致!
 
 // --- 要填充的消息的索引 (基于 0 的数组索引) ---
-// 注意：用户请求的是 mesid 1, 3, 7。在未删除消息的理想情况下，这对应数组索引 1, 3, 7。
-// 我们假设用户指的是数组索引，因为 mesid 本身可能不连续且不直接存储在 chat 数组中。
-const TARGET_MESSAGE_INDICES = [0, 2, 3];
+const TARGET_MESSAGE_INDICES = [1, 3, 7];
 
-/**
- * 核心功能：处理填充按钮点击事件
- */
+// 核心功能：处理填充按钮点击事件 (函数本身逻辑不变)
 async function handleFillButtonClick() {
-    console.log(`${logPrefix} 填充按钮被点击。`);
+    console.log(`${logPrefix} 设置页面内的填充按钮被点击。`);
 
-    const context = getContext(); // 获取当前上下文
+    const context = getContext();
 
     // --- 1. 状态检查 ---
     console.log(`${logPrefix} 开始状态检查...`);
@@ -63,9 +66,8 @@ async function handleFillButtonClick() {
 
     // --- 2. 获取并保存旧聊天信息 ---
     console.log(`${logPrefix} 获取旧聊天信息...`);
-    const oldChatId = context.getCurrentChatId(); // 获取旧聊天的 ID (主要用于日志)
-    // !! 创建旧聊天消息数组的完整副本，这是关键 !!
-    const oldChatMessages = [...globalChat];
+    const oldChatId = context.getCurrentChatId();
+    const oldChatMessages = [...globalChat]; // 完整副本
 
     if (!oldChatMessages || oldChatMessages.length === 0) {
         toastr.info("当前聊天是空的，无法提取消息。将只创建新聊天。");
@@ -79,9 +81,8 @@ async function handleFillButtonClick() {
             toastr.error("创建新聊天时出错。");
             console.error(`${logPrefix} 空聊天情况下，创建新聊天失败:`, error);
         }
-        return; // 结束流程
+        return;
     }
-
     console.log(`${logPrefix} 旧聊天信息获取成功。旧聊天 ID: ${oldChatId}, 共 ${oldChatMessages.length} 条消息。`);
     console.log(`${logPrefix} 目标消息索引 (基于0): ${TARGET_MESSAGE_INDICES.join(', ')}`);
 
@@ -90,16 +91,13 @@ async function handleFillButtonClick() {
     const messagesToCopy = [];
     for (const index of TARGET_MESSAGE_INDICES) {
         if (index >= 0 && index < oldChatMessages.length) {
-            // 索引有效，获取该消息
             const message = oldChatMessages[index];
             messagesToCopy.push(message);
             console.log(`${logPrefix}  - 找到索引 ${index} 的消息:`, message);
         } else {
-            // 索引无效 (例如聊天记录不够长)
             console.warn(`${logPrefix}  - 警告：索引 ${index} 超出当前聊天范围 (0-${oldChatMessages.length - 1})，将跳过。`);
         }
     }
-
     if (messagesToCopy.length === 0) {
         toastr.warning("在当前聊天中未找到任何指定索引的消息。");
         console.warn(`${logPrefix} 未找到任何有效索引的消息，操作中止。`);
@@ -110,86 +108,52 @@ async function handleFillButtonClick() {
     // --- 4. 执行聊天创建与填充 ---
     try {
         console.log(`${logPrefix} 开始创建新聊天...`);
-        // 创建新聊天并自动切换，不删除旧聊天
         await doNewChat({ deleteCurrentChat: false });
         toastr.success("新聊天已创建并激活！");
         console.log(`${logPrefix} 新聊天创建并激活成功。当前实体: ${currentEntity}`);
-        // 注意：此时 globalChat 变量已经指向新聊天的空数组（或包含初始消息）
 
         console.log(`${logPrefix} 开始将 ${messagesToCopy.length} 条筛选出的消息填充到新聊天...`);
-        // (可选) 显示加载指示器
-        // showLoader();
-
         for (let i = 0; i < messagesToCopy.length; i++) {
             const message = messagesToCopy[i];
-            // 创建消息副本，以防修改影响原始数组（虽然这里不太可能）
             const messageToAdd = { ...message };
-            // delete messageToAdd.mesid; // 通常不需要删除旧 mesid，addOneMessage 会处理
-            console.log(`${logPrefix}  - 正在添加第 ${i + 1}/${messagesToCopy.length} 条消息 (原索引 ${TARGET_MESSAGE_INDICES.find(idx => oldChatMessages[idx] === message)}):`, messageToAdd.mes); // 日志记录消息内容
-            await addOneMessage(messageToAdd, { scroll: false }); // 添加消息到新聊天，暂时不滚动
+            console.log(`${logPrefix}  - 正在添加第 ${i + 1}/${messagesToCopy.length} 条消息 (原索引 ${TARGET_MESSAGE_INDICES.find(idx => oldChatMessages[idx] === message)}):`, messageToAdd.mes);
+            await addOneMessage(messageToAdd, { scroll: false });
         }
         console.log(`${logPrefix} 所有目标消息已添加到新聊天界面。`);
 
-        // (可选) 隐藏加载指示器
-        // hideLoader();
-
-        // (可选) 滚动到底部
-        // context.scrollToBottom(); // 或者其他滚动方式
-
         console.log(`${logPrefix} 开始保存包含填充消息的新聊天...`);
-        await saveChatConditional(); // 保存新聊天
+        await saveChatConditional();
         toastr.success(`成功将 ${messagesToCopy.length} 条指定消息填充到新聊天并保存！`);
         console.log(`${logPrefix} 新聊天保存成功。`);
 
     } catch (error) {
-        // (可选) 隐藏加载指示器
-        // hideLoader();
         toastr.error("处理聊天创建或填充时发生错误。请查看控制台日志。");
         console.error(`${logPrefix} 创建或填充聊天时出错:`, error);
-        // 可以考虑添加错误恢复逻辑或提示
     }
 }
 
-/**
- * 插件初始化：添加按钮到 UI
- */
+// 插件 UI 初始化
 jQuery(async () => {
+    console.log(`${logPrefix} 开始初始化插件 UI (注入设置页面)...`);
     try {
-        console.log(`${logPrefix} 初始化插件 UI...`);
+        // --- 注入到扩展页面 ---
+        // 加载 HTML 模板内容
+        // 第一个参数: 'third-party/你的插件文件夹名'
+        // 第二个参数: HTML 文件名 (!!! 不需要 .html 后缀 !!!)
+        const settingsHtml = await renderExtensionTemplateAsync(`third-party/${pluginFolderName}`, 'settings_display');
 
-        // 创建按钮 HTML
-        const buttonHtml = `
-            <div id="chat-filler-button-container">
-                <button id="fill-chat-button" title="创建新聊天并填充指定旧消息">
-                    <i class="fa-solid fa-paste"></i> 填充
-                </button>
-            </div>
-        `;
+        // 将加载的 HTML 追加到 ST 的扩展设置区域
+        // 尝试 '#translation_container'，这是较新版本 ST 常用的区域
+        // 如果不行，可以回退尝试 '#extensions_settings'
+        const targetContainer = '#translation_container'; // 或者 '#extensions_settings'
+        $(targetContainer).append(settingsHtml);
+        console.log(`${logPrefix} 插件设置界面已添加至 ${targetContainer}`);
 
-        // 找到右上角的按钮栏容器 (可能需要根据 SillyTavern 版本微调选择器)
-        // #rm_button_bar 是一个常见的容器，包含右侧的按钮
-        // 我们尝试将按钮添加到这个容器的最前面
-        const $buttonBar = $('#rm_button_bar');
+        // 为设置界面中的新按钮绑定点击事件
+        // 注意按钮 ID 变更为 'my-plugin-fill-button-settings'
+        $('#my-plugin-fill-button-settings').on('click', handleFillButtonClick);
+        console.log(`${logPrefix} 设置页面内的填充按钮点击事件已绑定。`);
 
-        if ($buttonBar.length > 0) {
-            // 将按钮添加到容器的开头
-            $buttonBar.prepend(buttonHtml);
-            console.log(`${logPrefix} 填充按钮已添加到 #rm_button_bar。`);
-
-            // 为按钮绑定点击事件
-            $('#fill-chat-button').on('click', handleFillButtonClick);
-            console.log(`${logPrefix} 填充按钮点击事件已绑定。`);
-        } else {
-            console.error(`${logPrefix} 未找到按钮栏容器 (#rm_button_bar)，无法添加填充按钮。插件 UI 可能无法正常显示。`);
-            // 可以尝试备用位置，或者放弃添加按钮
-            // $('#top-bar').append(buttonHtml); // 备用尝试
-        }
-
-        // 加载插件设置（即使本插件没有设置，也是良好实践）
-        // extension_settings[extensionName] = extension_settings[extensionName] || {};
-        // if (Object.keys(extension_settings[extensionName]).length === 0) {
-        //     Object.assign(extension_settings[extensionName], {});
-        // }
         console.log(`${logPrefix} 插件 UI 初始化完成。`);
 
     } catch (error) {
