@@ -36,7 +36,7 @@ import { renderExtensionTemplateAsync } from '../../../extensions.js';
 // import { toastr } from '../../../../lib/toastr.js';
 
 // --- 插件常量 ---
-const extensionName = "chat-filler-plugin";
+const extensionName = "star0";
 const logPrefix = `[${extensionName}]`;
 const pluginFolderName = 'chat-filler-plugin'; // <--- 必须与你的插件文件夹名一致!
 
