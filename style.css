@@ -1,1 +1,8 @@
-
+/* star0/style.css */
+#star0_settings_block .menu_button {
+    background-color: #3a7a9e; /* 示例颜色 */
+    margin-left: 10px;
+}
+#star0_settings_block .menu_button:hover {
+    background-color: #4a90c1;
+}
