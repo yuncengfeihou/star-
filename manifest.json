@@ -1,0 +1,11 @@
+{
+    "display_name": "聊天填充插件1.0",
+    "loading_order": 10,
+    "requires": [],
+    "optional": [],
+    "js": "index.js",
+    "css": "style.css",
+    "author": "AI Assistant",
+    "version": "1.0.0",
+    "homePage": ""
+}
