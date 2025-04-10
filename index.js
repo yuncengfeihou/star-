@@ -36,7 +36,7 @@ const logPrefix = `[${extensionName}]`; // 日志前缀
 // --- 要填充的消息的索引 (基于 0 的数组索引) ---
 // 注意：用户请求的是 mesid 1, 3, 7。在未删除消息的理想情况下，这对应数组索引 1, 3, 7。
 // 我们假设用户指的是数组索引，因为 mesid 本身可能不连续且不直接存储在 chat 数组中。
-const TARGET_MESSAGE_INDICES = [1, 3, 7];
+const TARGET_MESSAGE_INDICES = [0, 2, 3];
 
 /**
  * 核心功能：处理填充按钮点击事件
